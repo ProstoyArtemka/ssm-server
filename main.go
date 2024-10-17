@@ -30,12 +30,7 @@ func main() {
 
 	for {
 		connection, err := listener.Accept()
-		peer := &lobby.Peer{Connection: connection, Connected: false}
 
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		go peer.HandleRequest()
+		lobby.HandleConnection(connection, err)
 	}
 }

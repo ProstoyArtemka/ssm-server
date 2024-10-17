@@ -1,88 +1,124 @@
 package lobby
 
 import (
-	"bufio"
-	"fmt"
-	"net"
 	"server/packets"
+	"server/utils"
 )
 
-type Peer struct {
-	Connection net.Conn
-	Connected  bool
-
-	Lobby []byte
-}
-
 type Lobby struct {
-	ID             []byte
-	ConnectedUsers []Peer
+	ID    byte
+	Peers []Peer
 }
+
+const MaxLobbiesCount = 16
 
 var Lobbies []Lobby
 
-func genereateLobbyID() []byte {
-	// Do some smart shit later
+func genereateLobbyID() byte {
+	for i := 0x00; i < MaxLobbiesCount; i++ {
 
-	return make([]byte, 4)
+		hasThisID := false
+		for j := 0; j < len(Lobbies); j++ {
+			lobby := Lobbies[j]
+
+			if lobby.ID == (byte)(i) {
+				break
+			}
+
+			hasThisID = true
+		}
+
+		if !hasThisID {
+			return (byte)(i)
+		}
+	}
+
+	return 0xAA
 }
 
 func NewLobby(admin Peer) (lobby *Lobby) {
 	lobbyID := genereateLobbyID()
 
-	connectedUsers := make([]Peer, 1)
-	connectedUsers[0] = admin
+	if lobbyID == 0xAA {
+		return nil
+	}
 
-	newLobby := &Lobby{ConnectedUsers: connectedUsers, ID: lobbyID}
+	peers := make([]Peer, 1)
+	peers[0] = admin
+
+	newLobby := &Lobby{Peers: peers, ID: lobbyID}
 
 	Lobbies = append(Lobbies, *newLobby)
 
 	return newLobby
 }
 
-func (peer *Peer) HandleRequest() {
-	reader := bufio.NewReader(peer.Connection)
+func GetLobby(id byte) (lobby *Lobby) {
+	for i := 0; i < len(Lobbies); i++ {
+		lobby := Lobbies[i]
 
-	for {
-		message, error := reader.ReadBytes(0xAA)
-
-		if error != nil {
-			peer.Connection.Close()
-
-			return
+		if lobby.ID == id {
+			return &lobby
 		}
-
-		message_length := len(message)
-
-		if message_length == 0 {
-			return
-		}
-
-		packet_type := message[0]
-		HandlePacket(packet_type, message[1:message_length-1], peer)
 	}
+
+	return nil
 }
 
-func HandlePacket(packet_type byte, message []byte, peer *Peer) {
-	if packet_type == packets.PACKET_CONNECTION {
-		peer.Connected = true
+func (lobby *Lobby) AddPeer(peer *Peer) {
+	message := []byte{packets.MESSAGE_OTHER_PEER_CONNECTED}
 
-		connected_lobby := message
+	lobby.WritePacket(packets.PACKET_MESSAGE, message)
 
-		fmt.Println(connected_lobby)
+	peer.Connected = true
+	peer.Lobby = lobby.ID
+
+	lobby.Peers = append(lobby.Peers, *peer)
+}
+
+func (lobby *Lobby) DisconnectPeer(peer *Peer) {
+	new_peers := make([]Peer, len(lobby.Peers)-1)
+
+	for i := 0; i < len(lobby.Peers); i++ {
+		loby_peer := lobby.Peers[i]
+
+		if loby_peer.ID == peer.ID {
+			continue
+		}
+
+		new_peers = append(new_peers, loby_peer)
+
+		message := []byte{packets.MESSAGE_PEER_DISCONNECTED, (byte)(peer.ID)}
+		loby_peer.WritePacket(packets.PACKET_MESSAGE, message)
 	}
 
-	if !peer.Connected {
-		peer.Connection.Close()
+	lobby.Peers = new_peers
+}
 
-		return
+func (lobby *Lobby) WritePacket(packet_type byte, message []byte) bool {
+	for i := 0; i < len(lobby.Peers); i++ {
+		peer := lobby.Peers[i]
+
+		if err := peer.WritePacket(packet_type, message); err != nil {
+			return false
+		}
 	}
 
-	if packet_type == packets.PACKET_MESSAGE {
-		fmt.Println(message)
+	return true
+}
+
+func (lobby *Lobby) WritePacketExclude(packet_type byte, message []byte, exclude []int) bool {
+	for i := 0; i < len(lobby.Peers); i++ {
+		peer := lobby.Peers[i]
+
+		if utils.Contains[int](exclude, peer.ID) {
+			continue
+		}
+
+		if err := peer.WritePacket(packet_type, message); err != nil {
+			return false
+		}
 	}
 
-	if packet_type == packets.PACKET_PULSE {
-		fmt.Println("Pulse!")
-	}
+	return true
 }
