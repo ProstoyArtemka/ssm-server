@@ -1,0 +1,10 @@
+package packets
+
+const (
+	PACKET_CONNECTION = 0x01
+
+	PACKET_PULSE   = 0x03
+	PACKET_MESSAGE = 0x04
+
+	PACKET_END = 0xAA
+)
