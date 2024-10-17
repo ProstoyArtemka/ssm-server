@@ -8,6 +8,8 @@ import (
 type Lobby struct {
 	ID    byte
 	Peers []Peer
+
+	Name string
 }
 
 const MaxLobbiesCount = 16
@@ -36,7 +38,7 @@ func genereateLobbyID() byte {
 	return 0xAA
 }
 
-func NewLobby(admin Peer) (lobby *Lobby) {
+func NewLobby(admin Peer, name string) (lobby *Lobby) {
 	lobbyID := genereateLobbyID()
 
 	if lobbyID == 0xAA {
@@ -46,7 +48,7 @@ func NewLobby(admin Peer) (lobby *Lobby) {
 	peers := make([]Peer, 1)
 	peers[0] = admin
 
-	newLobby := &Lobby{Peers: peers, ID: lobbyID}
+	newLobby := &Lobby{Peers: peers, ID: lobbyID, Name: name}
 
 	Lobbies = append(Lobbies, *newLobby)
 

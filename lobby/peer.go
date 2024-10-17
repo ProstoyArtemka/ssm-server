@@ -84,7 +84,7 @@ func handlePacket(packet_type byte, message []byte, peer *Peer) {
 	}
 
 	if packet_type == packets.PACKET_MESSAGE {
-		fmt.Println(message)
+		peer.handleMessage(message)
 	}
 
 	if packet_type == packets.PACKET_PULSE {
